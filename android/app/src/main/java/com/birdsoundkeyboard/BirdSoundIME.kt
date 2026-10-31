@@ -21,6 +21,7 @@ class BirdSoundIME : InputMethodService() {
     private val soundIds = mutableListOf<Int>()
     private val loadedSoundIds = mutableSetOf<Int>()
     private var lastPlayedIndex = -1
+    private var loadedBirdId: String? = null
 
     private var isShifted = false
     private var isCapsLock = false
@@ -38,10 +39,32 @@ class BirdSoundIME : InputMethodService() {
 
     override fun onCreate() {
         super.onCreate()
-        initializeSounds()
+        initializeSounds(forceReload = true)
     }
 
-    private fun initializeSounds() {
+    override fun onStartInputView(info: android.view.inputmethod.EditorInfo?, restarting: Boolean) {
+        super.onStartInputView(info, restarting)
+        initializeSounds(forceReload = false)
+    }
+
+    private fun initializeSounds(forceReload: Boolean) {
+        val selectedBirdId = getSharedPreferences(BirdSoundModule.PREFERENCES_NAME, 0)
+            .getString(BirdSoundModule.SELECTED_BIRD_KEY, "1") ?: "1"
+
+        if (!forceReload && selectedBirdId == loadedBirdId && soundPool != null) return
+
+        soundPool?.release()
+        soundPool = null
+        soundIds.clear()
+        loadedSoundIds.clear()
+        lastPlayedIndex = -1
+        loadedBirdId = selectedBirdId
+
+        val audioResources = when (selectedBirdId) {
+            "2" -> listOf(R.raw.robin_1, R.raw.robin_2, R.raw.robin_3)
+            else -> listOf(R.raw.sparrow_1, R.raw.sparrow_2, R.raw.sparrow_3)
+        }
+
         val attributes = AudioAttributes.Builder()
             .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
             .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
@@ -60,9 +83,9 @@ class BirdSoundIME : InputMethodService() {
             }
 
         try {
-            soundIds.add(soundPool!!.load(this, R.raw.sparrow_1, 1))
-            soundIds.add(soundPool!!.load(this, R.raw.sparrow_2, 1))
-            soundIds.add(soundPool!!.load(this, R.raw.sparrow_3, 1))
+            audioResources.forEach { resourceId ->
+                soundIds.add(soundPool!!.load(this, resourceId, 1))
+            }
         } catch (_: Exception) {
             soundPool?.release()
             soundPool = null
@@ -235,7 +258,7 @@ class BirdSoundIME : InputMethodService() {
 
             val button = Button(this).apply {
                 text = displayedText
-                textSize = if (key == "space") 10f else 15f
+                textSize = if (key == "space") 11f else 17f
                 isAllCaps = false
                 setTextColor(
                     if (key == "⇧" && (isShifted || isCapsLock)) {
@@ -259,12 +282,12 @@ class BirdSoundIME : InputMethodService() {
                 setPadding(0, 0, 0, 0)
                 minWidth = 0
                 minimumWidth = 0
-                minHeight = dp(35)
-                minimumHeight = dp(35)
+                minHeight = dp(45)
+                minimumHeight = dp(45)
 
                 layoutParams = LinearLayout.LayoutParams(
                     0,
-                    dp(35),
+                    dp(45),
                     when (key) {
                         "space" -> 2.5f
                         "⇧", "⌫", "?123", "ABC", "↵", "=\\<" -> 1.35f
@@ -354,14 +377,34 @@ class BirdSoundIME : InputMethodService() {
             }
 
             "↵" -> {
-                val handled = connection.performEditorAction(
-                    currentInputEditorInfo?.imeOptions?.and(
-                        android.view.inputmethod.EditorInfo.IME_MASK_ACTION
-                    ) ?: 0
-                )
+                val editorInfo = currentInputEditorInfo
+                val inputType = editorInfo?.inputType ?: 0
 
-                if (!handled) {
+                val isMultiline = (
+                    inputType and
+                    android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
+                ) != 0
+
+                if (isMultiline) {
                     connection.commitText("\n", 1)
+                } else {
+                    val action = editorInfo?.imeOptions?.and(
+                        android.view.inputmethod.EditorInfo.IME_MASK_ACTION
+                    ) ?: android.view.inputmethod.EditorInfo.IME_ACTION_UNSPECIFIED
+
+                    if (
+                        action != android.view.inputmethod.EditorInfo.IME_ACTION_UNSPECIFIED &&
+                        action != android.view.inputmethod.EditorInfo.IME_ACTION_NONE
+                    ) {
+                        connection.performEditorAction(action)
+                    } else {
+                        connection.sendKeyEvent(
+                            KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER)
+                        )
+                        connection.sendKeyEvent(
+                            KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER)
+                        )
+                    }
                 }
 
                 playBirdSound()

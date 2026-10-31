@@ -1,3 +1,4 @@
+
 # OSX
 #
 .DS_Store
@@ -32,8 +33,19 @@ local.properties
 *.hprof
 .cxx/
 *.keystore
+*.jks
 !debug.keystore
 .kotlin/
+
+# JVM crash and diagnostic logs
+#
+hs_err_pid*.log
+replay_pid*.log
+
+# Android build outputs
+#
+android/app/build/
+android/build/
 
 # node.js
 #

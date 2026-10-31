@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
@@ -13,57 +12,28 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const birdSounds = [
-  { id: '1', name: 'Sparrow', emoji: '🐦', description: 'Cheerful chirping' },
-  { id: '2', name: 'Robin', emoji: '🐤', description: 'Sweet bird song' },
-  { id: '3', name: 'Nightingale', emoji: '🎶', description: 'Melodious calls' },
-  { id: '4', name: 'Parrot', emoji: '🦜', description: 'Playful sounds' },
+  { id: '1', name: 'Sparrow', emoji: '🐦', description: 'Cheerful chirping', available: true },
+  { id: '2', name: 'Robin', emoji: '🐤', description: 'Sweet bird song', available: true },
+  { id: '3', name: 'Nightingale', emoji: '🎶', description: 'Melodious calls', available: false },
+  { id: '4', name: 'Parrot', emoji: '🦜', description: 'Playful sounds', available: false },
 ];
 
 export default function App() {
   const [selectedBird, setSelectedBird] = useState('1');
   const [isLoaded, setIsLoaded] = useState(false);
-  const [soundReady, setSoundReady] = useState(false);
-  const [soundMessage, setSoundMessage] = useState('Load the Sparrow clips to begin.',);
-
-  const loadSparrowSounds = async () => {
-    try {
-      setSoundMessage('Loading Sparrow sounds...');
-
-      await NativeModules.BirdSound.loadSparrowSounds();
-
-      setSoundReady(true);
-      setSoundMessage('Sparrow sounds are ready!');
-    } catch (error: any) {
-      setSoundReady(false);
-      setSoundMessage(
-        `Could not load sounds: ${error?.message ?? String(error)}`,
-      );
-    }
-  };
-
-  const playSparrowSound = async () => {
-    try {
-      const clipNumber =
-        await NativeModules.BirdSound.playRandomSparrowSound();
-
-      setSoundMessage(`Playing Sparrow clip ${clipNumber} of 3`);
-    } catch (error: any) {
-      setSoundMessage(
-        `Playback failed: ${error?.message ?? String(error)}`,
-      );
-    }
-  };
+  const [setupMessage, setSetupMessage] = useState(
+    'Enable BirdSound Keyboard in Android settings, then select it as your active keyboard.',
+  );
 
   useEffect(() => {
     const loadSelectedBird = async () => {
       try {
         const savedBird = await AsyncStorage.getItem('selectedBird');
-
-        if (savedBird !== null) {
-          setSelectedBird(savedBird);
-        }
+        const birdId = savedBird === '2' ? '2' : '1';
+        setSelectedBird(birdId);
+        await NativeModules.BirdSound.setSelectedBird(birdId);
       } catch (error) {
-        console.error('Failed to load selected bird:', error);
+        console.error('Failed to restore bird preference:', error);
       } finally {
         setIsLoaded(true);
       }
@@ -73,12 +43,26 @@ export default function App() {
   }, []);
 
   const selectBird = async (birdId: string) => {
-    setSelectedBird(birdId);
+    if (birdId !== '1' && birdId !== '2') return;
 
+    setSelectedBird(birdId);
     try {
       await AsyncStorage.setItem('selectedBird', birdId);
-    } catch (error) {
-      console.error('Failed to save selected bird:', error);
+      await NativeModules.BirdSound.setSelectedBird(birdId);
+    } catch (error: any) {
+      setSetupMessage(
+        `Could not save your bird selection: ${error?.message ?? String(error)}`,
+      );
+    }
+  };
+
+  const openKeyboardSettings = async () => {
+    try {
+      await NativeModules.BirdSound.openInputMethodSettings();
+    } catch (error: any) {
+      setSetupMessage(
+        `Could not open Android keyboard settings: ${error?.message ?? String(error)}`,
+      );
     }
   };
 
@@ -93,7 +77,7 @@ export default function App() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content"/>
+      <StatusBar barStyle="light-content" />
 
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
@@ -104,9 +88,7 @@ export default function App() {
           </View>
         </View>
 
-        <Text style={styles.tagline}>
-          Let your keyboard sing.
-        </Text>
+        <Text style={styles.tagline}>Let your keyboard sing.</Text>
 
         <View style={styles.setupCard}>
           <Text style={styles.sectionTitle}>Your keyboard</Text>
@@ -116,57 +98,18 @@ export default function App() {
 
           <TouchableOpacity
             style={styles.setupButton}
-            onPress={() => {}}
+            onPress={openKeyboardSettings}
             activeOpacity={0.8}
           >
-            <Text style={styles.setupButtonText}>
-              Set up keyboard →
-            </Text>
+            <Text style={styles.setupButtonText}>Set up keyboard →</Text>
           </TouchableOpacity>
 
-          <Text style={styles.note}>
-            Keyboard setup will be enabled in a later step.
-          </Text>
-        </View>
-
-        <View style={styles.soundTestCard}>
-          <Text style={styles.sectionTitle}>Sparrow Sound Test</Text>
-
-          <Text style={styles.cardDescription}>
-            Test your three short chirps with random playback and no
-            immediate repeats.
-          </Text>
-
-          <TouchableOpacity
-            style={styles.setupButton}
-            onPress={loadSparrowSounds}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.setupButtonText}>
-              Load Sparrow Sounds
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.playButton,
-              !soundReady && styles.disabledPlayButton,
-            ]}
-            onPress={playSparrowSound}
-            disabled={!soundReady}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.playButtonText}>
-              ▶ Play Sparrow Chirp
-            </Text>
-          </TouchableOpacity>
-
-          <Text style={styles.note}>{soundMessage}</Text>
+          <Text style={styles.note}>{setupMessage}</Text>
         </View>
 
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Choose your bird</Text>
-          <Text style={styles.counter}>4 SOUNDS</Text>
+          <Text style={styles.counter}>2 AVAILABLE</Text>
         </View>
 
         <View style={styles.birdGrid}>
@@ -175,23 +118,30 @@ export default function App() {
               key={bird.id}
               style={[
                 styles.birdCard,
-                selectedBird === bird.id && styles.selectedBirdCard,
+                !bird.available && styles.comingSoonCard,
+                bird.available && selectedBird === bird.id && styles.selectedBirdCard,
               ]}
               onPress={() => selectBird(bird.id)}
+              disabled={!bird.available}
               activeOpacity={0.8}
             >
               <Text style={styles.birdEmoji}>{bird.emoji}</Text>
               <Text style={styles.birdName}>{bird.name}</Text>
-              <Text style={styles.birdDescription}>
-                {bird.description}
-              </Text>
+              <Text style={styles.birdDescription}>{bird.description}</Text>
+              {bird.available ? (
+                <Text style={styles.availableLabel}>
+                  {selectedBird === bird.id ? '✓ SELECTED' : 'AVAILABLE'}
+                </Text>
+              ) : (
+                <View style={styles.comingSoonBadge}>
+                  <Text style={styles.comingSoonText}>COMING SOON</Text>
+                </View>
+              )}
             </TouchableOpacity>
           ))}
         </View>
 
-        <Text style={styles.footer}>
-          MADE FOR THE LOVE OF BIRDS
-        </Text>
+        <Text style={styles.footer}>MADE FOR THE LOVE OF BIRDS</Text>
       </ScrollView>
     </SafeAreaView>
   );
@@ -297,7 +247,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 18,
     padding: 16,
-    minHeight: 145,
+    minHeight: 165,
+  },
+  comingSoonCard: {
+    opacity: 0.52,
   },
   birdEmoji: {
     fontSize: 32,
@@ -313,6 +266,27 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 6,
   },
+  availableLabel: {
+    color: '#B8D99A',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 1,
+    marginTop: 12,
+  },
+  comingSoonBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#354235',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    marginTop: 10,
+  },
+  comingSoonText: {
+    color: '#D0D8C9',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.7,
+  },
   footer: {
     color: '#71816A',
     fontSize: 10,
@@ -325,28 +299,5 @@ const styles = StyleSheet.create({
     backgroundColor: '#263A26',
     borderColor: '#B8D99A',
     borderWidth: 2,
-  },
-  soundTestCard: {
-  backgroundColor: '#1B2B1E',
-  borderColor: '#344C35',
-  borderWidth: 1,
-  borderRadius: 22,
-  padding: 20,
-  marginBottom: 32,
-},
-  playButton: {
-    backgroundColor: '#344C35',
-    borderRadius: 13,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: 12,
-  },
-  disabledPlayButton: {
-    opacity: 0.45,
-  },
-  playButtonText: {
-    color: '#F3F6ED',
-    fontSize: 15,
-    fontWeight: '800',
   },
 });
