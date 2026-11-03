@@ -14,6 +14,9 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 import kotlin.random.Random
+import android.os.Handler
+import android.os.Looper
+import android.view.MotionEvent
 
 class BirdSoundIME : InputMethodService() {
 
@@ -36,6 +39,35 @@ class BirdSoundIME : InputMethodService() {
     private val specialKeyBackground = Color.rgb(65, 82, 64)
     private val keyTextColor = Color.rgb(243, 246, 237)
     private val accentColor = Color.rgb(184, 217, 154)
+
+    private val deleteHandler = Handler(Looper.getMainLooper())
+    private var isBackspaceHeld = false
+
+    private val backspaceRunnable = object : Runnable {
+        override fun run() {
+            if (!isBackspaceHeld) return
+
+            deleteCharacter()
+            deleteHandler.postDelayed(this, 60L)
+        }
+    }
+
+    private fun deleteCharacter() {
+        val connection = currentInputConnection ?: return
+
+        val deleted = connection.deleteSurroundingText(1, 0)
+
+        if (!deleted) {
+            connection.sendKeyEvent(
+                KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL)
+            )
+            connection.sendKeyEvent(
+                KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DEL)
+            )
+        }
+
+        playBirdSound()
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -61,8 +93,29 @@ class BirdSoundIME : InputMethodService() {
         loadedBirdId = selectedBirdId
 
         val audioResources = when (selectedBirdId) {
-            "2" -> listOf(R.raw.robin_1, R.raw.robin_2, R.raw.robin_3)
-            else -> listOf(R.raw.sparrow_1, R.raw.sparrow_2, R.raw.sparrow_3)
+            "2" -> listOf(
+                R.raw.robin_1,
+                R.raw.robin_2,
+                R.raw.robin_3
+            )
+
+            "3" -> listOf(
+                R.raw.nightingale_1,
+                R.raw.nightingale_2,
+                R.raw.nightingale_3
+            )
+
+            "4" -> listOf(
+                R.raw.parrot_1,
+                R.raw.parrot_2,
+                R.raw.parrot_3
+            )
+
+            else -> listOf(
+                R.raw.sparrow_1,
+                R.raw.sparrow_2,
+                R.raw.sparrow_3
+            )
         }
 
         val attributes = AudioAttributes.Builder()
@@ -258,7 +311,7 @@ class BirdSoundIME : InputMethodService() {
 
             val button = Button(this).apply {
                 text = displayedText
-                textSize = if (key == "space") 11f else 17f
+                textSize = if (key == "space") 12f else 18f
                 isAllCaps = false
                 setTextColor(
                     if (key == "⇧" && (isShifted || isCapsLock)) {
@@ -282,23 +335,42 @@ class BirdSoundIME : InputMethodService() {
                 setPadding(0, 0, 0, 0)
                 minWidth = 0
                 minimumWidth = 0
-                minHeight = dp(45)
-                minimumHeight = dp(45)
+                minHeight = dp(48)
+                minimumHeight = dp(48)
 
                 layoutParams = LinearLayout.LayoutParams(
                     0,
-                    dp(45),
+                    dp(48),
                     when (key) {
                         "space" -> 2.5f
                         "⇧", "⌫", "?123", "ABC", "↵", "=\\<" -> 1.35f
                         else -> 1f
                     }
                 ).apply {
-                    setMargins(dp(2), dp(2), dp(2), dp(2))
+                    setMargins(dp(2), dp(3), dp(2), dp(3))
                 }
 
                 setOnClickListener {
                     handleKey(key)
+                }
+
+                if (key == "⌫") {
+                    setOnLongClickListener {
+                        isBackspaceHeld = true
+                        deleteHandler.postDelayed(backspaceRunnable, 60L)
+                        true
+                    }
+
+                    setOnTouchListener { _, event ->
+                        when (event.action) {
+                            MotionEvent.ACTION_UP,
+                            MotionEvent.ACTION_CANCEL -> {
+                                isBackspaceHeld = false
+                                deleteHandler.removeCallbacks(backspaceRunnable)
+                            }
+                        }
+                        false
+                    }
                 }
             }
 
@@ -349,23 +421,7 @@ class BirdSoundIME : InputMethodService() {
             }
 
             "⌫" -> {
-                val deleted = connection.deleteSurroundingText(1, 0)
-
-                if (!deleted) {
-                    connection.sendKeyEvent(
-                        KeyEvent(
-                            KeyEvent.ACTION_DOWN,
-                            KeyEvent.KEYCODE_DEL
-                        )
-                    )
-                    connection.sendKeyEvent(
-                        KeyEvent(
-                            KeyEvent.ACTION_UP,
-                            KeyEvent.KEYCODE_DEL
-                        )
-                    )
-                }
-                playBirdSound()
+                deleteCharacter()
                 return
             }
 
@@ -458,6 +514,8 @@ class BirdSoundIME : InputMethodService() {
         soundIds.clear()
         loadedSoundIds.clear()
         keyboardRoot = null
+        isBackspaceHeld = false
+        deleteHandler.removeCallbacks(backspaceRunnable)
         super.onDestroy()
     }
 }

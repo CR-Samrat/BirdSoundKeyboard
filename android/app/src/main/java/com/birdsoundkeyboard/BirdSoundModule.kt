@@ -15,8 +15,8 @@ class BirdSoundModule(
 
     @ReactMethod
     fun setSelectedBird(birdId: String, promise: Promise) {
-        if (birdId != "1" && birdId != "2") {
-            promise.reject("UNAVAILABLE_BIRD", "This bird is not available yet.")
+        if (birdId !in listOf("1", "2", "3", "4")) {
+            promise.reject("INVALID_BIRD", "Invalid bird selection.")
             return
         }
 

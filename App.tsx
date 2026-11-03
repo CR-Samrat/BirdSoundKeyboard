@@ -12,10 +12,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const birdSounds = [
-  { id: '1', name: 'Sparrow', emoji: '🐦', description: 'Cheerful chirping', available: true },
-  { id: '2', name: 'Robin', emoji: '🐤', description: 'Sweet bird song', available: true },
-  { id: '3', name: 'Nightingale', emoji: '🎶', description: 'Melodious calls', available: false },
-  { id: '4', name: 'Parrot', emoji: '🦜', description: 'Playful sounds', available: false },
+  { id: '1', name: 'Sparrow', emoji: '🐦', description: 'Cheerful chirping' },
+  { id: '2', name: 'Robin', emoji: '🐤', description: 'Sweet bird song' },
+  { id: '3', name: 'Nightingale', emoji: '🎶', description: 'Melodious calls' },
+  { id: '4', name: 'Parrot', emoji: '🦜', description: 'Playful sounds' },
 ];
 
 export default function App() {
@@ -29,7 +29,11 @@ export default function App() {
     const loadSelectedBird = async () => {
       try {
         const savedBird = await AsyncStorage.getItem('selectedBird');
-        const birdId = savedBird === '2' ? '2' : '1';
+
+        const birdId = birdSounds.some((bird) => bird.id === savedBird)
+          ? savedBird!
+          : '1';
+
         setSelectedBird(birdId);
         await NativeModules.BirdSound.setSelectedBird(birdId);
       } catch (error) {
@@ -43,9 +47,10 @@ export default function App() {
   }, []);
 
   const selectBird = async (birdId: string) => {
-    if (birdId !== '1' && birdId !== '2') return;
+    if (!birdSounds.some((bird) => bird.id === birdId)) return;
 
     setSelectedBird(birdId);
+
     try {
       await AsyncStorage.setItem('selectedBird', birdId);
       await NativeModules.BirdSound.setSelectedBird(birdId);
@@ -109,7 +114,7 @@ export default function App() {
 
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Choose your bird</Text>
-          <Text style={styles.counter}>2 AVAILABLE</Text>
+          <Text style={styles.counter}>4 BIRDS</Text>
         </View>
 
         <View style={styles.birdGrid}>
@@ -118,24 +123,17 @@ export default function App() {
               key={bird.id}
               style={[
                 styles.birdCard,
-                !bird.available && styles.comingSoonCard,
-                bird.available && selectedBird === bird.id && styles.selectedBirdCard,
+                selectedBird === bird.id && styles.selectedBirdCard,
               ]}
               onPress={() => selectBird(bird.id)}
-              disabled={!bird.available}
               activeOpacity={0.8}
             >
               <Text style={styles.birdEmoji}>{bird.emoji}</Text>
               <Text style={styles.birdName}>{bird.name}</Text>
               <Text style={styles.birdDescription}>{bird.description}</Text>
-              {bird.available ? (
-                <Text style={styles.availableLabel}>
-                  {selectedBird === bird.id ? '✓ SELECTED' : 'AVAILABLE'}
-                </Text>
-              ) : (
-                <View style={styles.comingSoonBadge}>
-                  <Text style={styles.comingSoonText}>COMING SOON</Text>
-                </View>
+
+              {selectedBird === bird.id && (
+                <Text style={styles.availableLabel}>✓ SELECTED</Text>
               )}
             </TouchableOpacity>
           ))}
@@ -249,9 +247,6 @@ const styles = StyleSheet.create({
     padding: 16,
     minHeight: 165,
   },
-  comingSoonCard: {
-    opacity: 0.52,
-  },
   birdEmoji: {
     fontSize: 32,
     marginBottom: 12,
@@ -272,20 +267,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 1,
     marginTop: 12,
-  },
-  comingSoonBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#354235',
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    marginTop: 10,
-  },
-  comingSoonText: {
-    color: '#D0D8C9',
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 0.7,
   },
   footer: {
     color: '#71816A',
